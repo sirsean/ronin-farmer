@@ -1,0 +1,704 @@
+[
+  {
+    "inputs": [],
+    "name": "",
+    "outputs": null,
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "constructor",
+    "anonymous": false
+  },
+  {
+    "inputs": [
+      {
+        "internal_type": "",
+        "name": "_user",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "internal_type": "",
+        "name": "_token",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "internal_type": "",
+        "name": "_tokenId",
+        "type": "uint256",
+        "indexed": true
+      }
+    ],
+    "name": "EmergencyUnstaked",
+    "outputs": null,
+    "payable": false,
+    "stateMutability": "",
+    "type": "event",
+    "anonymous": false
+  },
+  {
+    "inputs": [
+      {
+        "internal_type": "",
+        "name": "version",
+        "type": "uint8",
+        "indexed": false
+      }
+    ],
+    "name": "Initialized",
+    "outputs": null,
+    "payable": false,
+    "stateMutability": "",
+    "type": "event",
+    "anonymous": false
+  },
+  {
+    "inputs": [
+      {
+        "internal_type": "",
+        "name": "previousOwner",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "internal_type": "",
+        "name": "newOwner",
+        "type": "address",
+        "indexed": true
+      }
+    ],
+    "name": "OwnershipTransferred",
+    "outputs": null,
+    "payable": false,
+    "stateMutability": "",
+    "type": "event",
+    "anonymous": false
+  },
+  {
+    "inputs": [
+      {
+        "internal_type": "",
+        "name": "account",
+        "type": "address",
+        "indexed": false
+      }
+    ],
+    "name": "Paused",
+    "outputs": null,
+    "payable": false,
+    "stateMutability": "",
+    "type": "event",
+    "anonymous": false
+  },
+  {
+    "inputs": [
+      {
+        "internal_type": "",
+        "name": "_user",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "internal_type": "",
+        "name": "_token",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "internal_type": "",
+        "name": "_tokenId",
+        "type": "uint256",
+        "indexed": true
+      }
+    ],
+    "name": "RewardClaimed",
+    "outputs": null,
+    "payable": false,
+    "stateMutability": "",
+    "type": "event",
+    "anonymous": false
+  },
+  {
+    "inputs": [
+      {
+        "internal_type": "",
+        "name": "_user",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "internal_type": "",
+        "name": "_token",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "internal_type": "",
+        "name": "_tokenId",
+        "type": "uint256",
+        "indexed": true
+      }
+    ],
+    "name": "Staked",
+    "outputs": null,
+    "payable": false,
+    "stateMutability": "",
+    "type": "event",
+    "anonymous": false
+  },
+  {
+    "inputs": [
+      {
+        "internal_type": "",
+        "name": "account",
+        "type": "address",
+        "indexed": false
+      }
+    ],
+    "name": "Unpaused",
+    "outputs": null,
+    "payable": false,
+    "stateMutability": "",
+    "type": "event",
+    "anonymous": false
+  },
+  {
+    "inputs": [
+      {
+        "internal_type": "",
+        "name": "_user",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "internal_type": "",
+        "name": "_token",
+        "type": "address",
+        "indexed": true
+      },
+      {
+        "internal_type": "",
+        "name": "_tokenId",
+        "type": "uint256",
+        "indexed": true
+      }
+    ],
+    "name": "Unstaked",
+    "outputs": null,
+    "payable": false,
+    "stateMutability": "",
+    "type": "event",
+    "anonymous": false
+  },
+  {
+    "inputs": [],
+    "name": "claimPendingRewards",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "anonymous": false
+  },
+  {
+    "inputs": [],
+    "name": "emergencyUnstake",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "anonymous": false
+  },
+  {
+    "inputs": [
+      {
+        "internal_type": "",
+        "name": "_amount",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "name": "emergencyUnstakeSome",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "anonymous": false
+  },
+  {
+    "inputs": [
+      {
+        "internal_type": "",
+        "name": "_user",
+        "type": "address",
+        "indexed": false
+      }
+    ],
+    "name": "getPendingRewards",
+    "outputs": [
+      {
+        "internal_type": "",
+        "name": "",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function",
+    "anonymous": false
+  },
+  {
+    "inputs": [],
+    "name": "getRewardToken",
+    "outputs": [
+      {
+        "internal_type": "",
+        "name": "",
+        "type": "address",
+        "indexed": false
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function",
+    "anonymous": false
+  },
+  {
+    "inputs": [
+      {
+        "internal_type": "",
+        "name": "_user",
+        "type": "address",
+        "indexed": false
+      }
+    ],
+    "name": "getStakedLandTypes",
+    "outputs": [
+      {
+        "internal_type": "",
+        "name": "",
+        "type": "uint256[5]",
+        "indexed": false
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function",
+    "anonymous": false
+  },
+  {
+    "inputs": [
+      {
+        "internal_type": "",
+        "name": "_user",
+        "type": "address",
+        "indexed": false
+      }
+    ],
+    "name": "getStakedLands",
+    "outputs": [
+      {
+        "internal_type": "",
+        "name": "",
+        "type": "uint256[]",
+        "indexed": false
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function",
+    "anonymous": false
+  },
+  {
+    "inputs": [
+      {
+        "internal_type": "",
+        "name": "_user",
+        "type": "address",
+        "indexed": false
+      }
+    ],
+    "name": "getStakingAmount",
+    "outputs": [
+      {
+        "internal_type": "",
+        "name": "",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function",
+    "anonymous": false
+  },
+  {
+    "inputs": [],
+    "name": "getStakingToken",
+    "outputs": [
+      {
+        "internal_type": "",
+        "name": "",
+        "type": "address",
+        "indexed": false
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function",
+    "anonymous": false
+  },
+  {
+    "inputs": [],
+    "name": "getStakingTotal",
+    "outputs": [
+      {
+        "internal_type": "",
+        "name": "",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function",
+    "anonymous": false
+  },
+  {
+    "inputs": [],
+    "name": "getTotalStakedPerLandType",
+    "outputs": [
+      {
+        "internal_type": "",
+        "name": "",
+        "type": "uint256[5]",
+        "indexed": false
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function",
+    "anonymous": false
+  },
+  {
+    "inputs": [
+      {
+        "internal_type": "",
+        "name": "_admin",
+        "type": "address",
+        "indexed": false
+      },
+      {
+        "internal_type": "",
+        "name": "_managerContract",
+        "type": "address",
+        "indexed": false
+      },
+      {
+        "internal_type": "",
+        "name": "_landContract",
+        "type": "address",
+        "indexed": false
+      },
+      {
+        "internal_type": "",
+        "name": "_landTypeContract",
+        "type": "address",
+        "indexed": false
+      },
+      {
+        "internal_type": "",
+        "name": "_rewardToken",
+        "type": "address",
+        "indexed": false
+      }
+    ],
+    "name": "initialize",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "anonymous": false
+  },
+  {
+    "inputs": [],
+    "name": "landContract",
+    "outputs": [
+      {
+        "internal_type": "",
+        "name": "",
+        "type": "address",
+        "indexed": false
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function",
+    "anonymous": false
+  },
+  {
+    "inputs": [],
+    "name": "landTypeContract",
+    "outputs": [
+      {
+        "internal_type": "",
+        "name": "",
+        "type": "address",
+        "indexed": false
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function",
+    "anonymous": false
+  },
+  {
+    "inputs": [],
+    "name": "managerContract",
+    "outputs": [
+      {
+        "internal_type": "",
+        "name": "",
+        "type": "address",
+        "indexed": false
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function",
+    "anonymous": false
+  },
+  {
+    "inputs": [],
+    "name": "owner",
+    "outputs": [
+      {
+        "internal_type": "",
+        "name": "",
+        "type": "address",
+        "indexed": false
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function",
+    "anonymous": false
+  },
+  {
+    "inputs": [],
+    "name": "pause",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "anonymous": false
+  },
+  {
+    "inputs": [],
+    "name": "paused",
+    "outputs": [
+      {
+        "internal_type": "",
+        "name": "",
+        "type": "bool",
+        "indexed": false
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function",
+    "anonymous": false
+  },
+  {
+    "inputs": [],
+    "name": "renounceOwnership",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "anonymous": false
+  },
+  {
+    "inputs": [],
+    "name": "rewardToken",
+    "outputs": [
+      {
+        "internal_type": "",
+        "name": "",
+        "type": "address",
+        "indexed": false
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function",
+    "anonymous": false
+  },
+  {
+    "inputs": [
+      {
+        "internal_type": "",
+        "name": "_tokenIds",
+        "type": "uint256[]",
+        "indexed": false
+      }
+    ],
+    "name": "stake",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "anonymous": false
+  },
+  {
+    "inputs": [
+      {
+        "internal_type": "",
+        "name": "",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "name": "stakedBy",
+    "outputs": [
+      {
+        "internal_type": "",
+        "name": "",
+        "type": "address",
+        "indexed": false
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function",
+    "anonymous": false
+  },
+  {
+    "inputs": [],
+    "name": "totalStaked",
+    "outputs": [
+      {
+        "internal_type": "",
+        "name": "",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function",
+    "anonymous": false
+  },
+  {
+    "inputs": [
+      {
+        "internal_type": "",
+        "name": "",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "name": "totalStakedPerLandType",
+    "outputs": [
+      {
+        "internal_type": "",
+        "name": "",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function",
+    "anonymous": false
+  },
+  {
+    "inputs": [
+      {
+        "internal_type": "",
+        "name": "newOwner",
+        "type": "address",
+        "indexed": false
+      }
+    ],
+    "name": "transferOwnership",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "anonymous": false
+  },
+  {
+    "inputs": [],
+    "name": "unpause",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "anonymous": false
+  },
+  {
+    "inputs": [
+      {
+        "internal_type": "",
+        "name": "_tokenIds",
+        "type": "uint256[]",
+        "indexed": false
+      }
+    ],
+    "name": "unstake",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "anonymous": false
+  },
+  {
+    "inputs": [],
+    "name": "unstakeAll",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "anonymous": false
+  },
+  {
+    "inputs": [
+      {
+        "internal_type": "",
+        "name": "_amount",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "name": "unstakeSome",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function",
+    "anonymous": false
+  },
+  {
+    "inputs": [
+      {
+        "internal_type": "",
+        "name": "",
+        "type": "address",
+        "indexed": false
+      }
+    ],
+    "name": "userInfo",
+    "outputs": [
+      {
+        "internal_type": "",
+        "name": "amountStaked",
+        "type": "uint256",
+        "indexed": false
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function",
+    "anonymous": false
+  }
+]
