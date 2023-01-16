@@ -60,3 +60,14 @@ npx hardhat lp-pending
 npx hardhat axs-sweep
 npx hardhat lp-sweep
 ```
+
+# Donate
+
+This saves you time and makes you money, so I thought about having it
+take a commission. But I figure that'd be easy to circumvent and would
+not make anyone happy.
+
+Instead, I'll just ask you to consider kicking me some of the RON or AXS
+you're pulling in, purely as a donation. Because you're cool.
+
+`ronin:560ebafd8db62cbdb44b50539d65b48072b98277`
