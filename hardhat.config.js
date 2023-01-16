@@ -194,35 +194,91 @@ task('lp-slp-pending', 'Pending RON in SLP/WETH LP staking pool')
             .then(console.log);
     });
 
+async function lpClaimAll(hre) {
+    const ronPool = await ronWethLPStakingContract(hre);
+    const axsPool = await axsWethLPStakingContract(hre);
+    const slpPool = await slpWethLPStakingContract(hre);
+    console.log('claiming from RON pool');
+    await ronPool.claimPendingRewards().then(tx => tx.wait());
+    console.log('claiming from AXS pool');
+    await axsPool.claimPendingRewards().then(tx => tx.wait());
+    console.log('claiming from SLP pool');
+    await slpPool.claimPendingRewards().then(tx => tx.wait());
+}
+
+async function sellHalfRon(hre) {
+    const address = await getAddress(hre);
+    const router = await katanaRouterContract(hre);
+    const lp = await ronWethLPContract(hre);
+    const MIN_RON = hre.ethers.utils.parseEther('500');
+    const ronBalance = await hre.ethers.provider.getBalance(address);
+    if (ronBalance.lte(MIN_RON)) {
+        throw new Error(`insufficient RON: ${hre.ethers.utils.formatEther(ronBalance, 'ether')} < ${hre.ethers.utils.formatEther(MIN_RON, 'ether')}`);
+    }
+    const ronToSell = ronBalance.sub(MIN_RON).div(2);
+    const [ reserve0, reserve1, reserveTimestamp ] = await lp.getReserves();
+    const amountOut = await router.getAmountOut(ronToSell, reserve1, reserve0);
+    const amountOutMin = amountOut.sub(amountOut.div(100).mul(2));
+    console.log(`swap ${fe(hre, ronToSell)} RON for ${fe(hre, amountOutMin)}-${fe(hre, amountOut)} WETH`);
+    await router.swapExactRONForTokens(amountOutMin, [WRON, WETH], address, reserveTimestamp + 1000, { value: ronToSell }).then(tx => tx.wait());
+}
+
+async function lpAddRonWeth(hre) {
+    const address = await getAddress(hre);
+    const router = await katanaRouterContract(hre);
+    const lp = await ronWethLPContract(hre);
+
+    // make sure we have enough RON
+    const MIN_RON = hre.ethers.utils.parseEther('500');
+    const ronBalance = await hre.ethers.provider.getBalance(address);
+    if (ronBalance.lte(MIN_RON)) {
+        throw new Error(`insufficient RON: ${fe(hre, ronBalance)} < ${fe(hre, MIN_RON)}`);
+    }
+
+    // calculate how much RON & WETH to send
+    const wethBalance = await getContractAt(hre, erc20Abi, WETH).then(c => c.balanceOf(address));
+    const [ reserve0, reserve1, reserveTimestamp ] = await lp.getReserves();
+    const ronToSend = await router.getAmountIn(wethBalance, reserve1, reserve0);
+    const wethMin = wethBalance.sub(wethBalance.div(100).mul(2));
+    const ronMin = ronToSend.sub(ronToSend.div(100).mul(2));
+
+    // add RON & WETH to LP
+    console.log(`add LP: ${fe(hre, ronMin)}-${fe(hre, ronToSend)} RON ${fe(hre, wethMin)}-${fe(hre, wethBalance)} WETH`);
+    await router.addLiquidityRON(WETH, wethBalance, wethMin, ronMin, address, reserveTimestamp + 1000, { value: ronToSend }).then(tx => tx.wait());
+}
+
+async function lpStakeAll(hre) {
+    const address = await getAddress(hre);
+    const lp = await ronWethLPContract(hre);
+    const pool = await ronWethLPStakingContract(hre);
+
+    const lpBalance = await lp.balanceOf(address);
+    console.log(`staking ${fe(hre, lpBalance)} RON/WETH LP`);
+    await pool.stake(lpBalance).then(tx => tx.wait());
+}
+
 task('lp-claim', 'Claim all RON from Katana farms')
     .setAction(async (_, hre) => {
-        const ronPool = await ronWethLPStakingContract(hre);
-        const axsPool = await axsWethLPStakingContract(hre);
-        const slpPool = await slpWethLPStakingContract(hre);
-        console.log('claiming from RON pool');
-        await ronPool.claimPendingRewards().then(tx => tx.wait());
-        console.log('claiming from AXS pool');
-        await axsPool.claimPendingRewards().then(tx => tx.wait());
-        console.log('claiming from SLP pool');
-        await slpPool.claimPendingRewards().then(tx => tx.wait());
+        await lpClaimAll(hre);
     });
 
 task('ron-sell', 'Sell some RON for WETH')
     .setAction(async (_, hre) => {
-        const address = await getAddress(hre);
-        const router = await katanaRouterContract(hre);
-        const lp = await ronWethLPContract(hre);
-        const MIN_RON = hre.ethers.utils.parseEther('500');
-        const ronBalance = await hre.ethers.provider.getBalance(address);
-        if (ronBalance.lte(MIN_RON)) {
-            throw new Error(`insufficient RON: ${hre.ethers.utils.formatEther(ronBalance, 'ether')} < ${hre.ethers.utils.formatEther(MIN_RON, 'ether')}`);
-        }
-        const ronToSell = ronBalance.sub(MIN_RON).div(2);
-        const [ reserve0, reserve1, reserveTimestamp ] = await lp.getReserves();
-        const amountOut = await router.getAmountOut(ronToSell, reserve1, reserve0);
-        const amountOutMin = amountOut.sub(amountOut.div(100).mul(2));
-        console.log(`swap ${fe(hre, ronToSell)} RON for ${fe(hre, amountOutMin)}-${fe(hre, amountOut)} WETH`);
-        await router.swapExactRONForTokens(amountOutMin, [WRON, WETH], address, reserveTimestamp + 1000, { value: ronToSell }).then(tx => tx.wait());
+        await sellHalfRon(hre);
+    });
+
+task('lp-add', 'Add RON/WETH liquidity and stake it to the farm')
+    .setAction(async (_, hre) => {
+        await lpAddRonWeth(hre);
+        await lpStakeAll(hre);
+    });
+
+task('lp-sweep', 'Claim all RON from Katana farms, sell RON for WETH, deposit RON/WETH LP, stake it')
+    .setAction(async (_, hre) => {
+        await lpClaimAll(hre);
+        await sellHalfRon(hre);
+        await lpAddRonWeth(hre);
+        await lpStakeAll(hre);
     });
 
 /** @type import('hardhat/config').HardhatUserConfig */
