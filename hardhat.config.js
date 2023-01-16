@@ -132,38 +132,55 @@ task('land-pending', 'Land AXS Pending')
             .then(console.log);
     });
 
+async function landClaim(hre) {
+    const landStaking = await landStakingContract(hre);
+    await landStaking.estimateGas.claimPendingRewards()
+        .then(gas => landStaking.claimPendingRewards({ gasLimit: gas.mul(2) }))
+        .then(tx => tx.wait());
+}
+
+async function axsRestake(hre) {
+    const axsStaking = await axsStakingContract(hre);
+    await axsStaking.estimateGas.restakeRewards()
+        .then(gas => axsStaking.restakeRewards({ gasLimit: gas.mul(2) }))
+        .then(tx => tx.wait());
+}
+
+async function axsStakeAll(hre) {
+    const address = await getAddress(hre);
+    const axs = await getContractAt(hre, erc20Abi, AXS);
+    const axsStaking = await axsStakingContract(hre);
+    await axs.balanceOf(address)
+        .then(balance => {
+            return axsStaking.estimateGas.stake(balance)
+                .then(gas => axsStaking.stake(balance, { gasLimit: gas.mul(2) }))
+        })
+        .then(tx => tx.wait());
+}
+
 task('land-claim', 'Claim AXS from staked land')
     .setAction(async (_, hre) => {
-        const landStaking = await landStakingContract(hre);
-        await landStaking.claimPendingRewards().then(tx => tx.wait());
+        await landClaim(hre);
     });
 
 task('axs-restake', 'Restake AXS')
     .setAction(async (_, hre) => {
-        const axsStaking = await axsStakingContract(hre);
-        await axsStaking.restakeRewards().then(tx => tx.wait());
+        await axsRestake(hre);
     });
 
 task('axs-stake-all', 'Stake all your AXS')
     .setAction(async (_, hre) => {
-        const address = await getAddress(hre);
-        const axs = await getContractAt(hre, erc20Abi, AXS);
-        const axsStaking = await axsStakingContract(hre);
-        await axs.balanceOf(address).then(balance => axsStaking.stake(balance)).then(tx => tx.wait());
+        await axsStakeAll(hre);
     });
 
 task('axs-sweep', 'Sweep pending AXS')
     .setAction(async (_, hre) => {
-        const address = await getAddress(hre);
-        const axs = await getContractAt(hre, erc20Abi, AXS);
-        const landStaking = await landStakingContract(hre);
-        const axsStaking = await axsStakingContract(hre);
         console.log('claiming land rewards');
-        await landStaking.claimPendingRewards().then(tx => tx.wait());
+        await landClaim(hre);
         console.log('restaking AXS rewards');
-        await axsStaking.restakeRewards().then(tx => tx.wait());
+        await axsRestake(hre);
         console.log('staking all AXS');
-        await axs.balanceOf(address).then(balance => axsStaking.stake(balance)).then(tx => tx.wait());
+        await axsStakeAll(hre);
         console.log('sweep completed');
     });
 
@@ -194,16 +211,34 @@ task('lp-slp-pending', 'Pending RON in SLP/WETH LP staking pool')
             .then(console.log);
     });
 
+task('lp-pending', 'Pending RON across LP staking pools')
+    .setAction(async (_, hre) => {
+        const address = await getAddress(hre);
+        await Promise.all([
+            ronWethLPStakingContract(hre).then(c => c.getPendingRewards(address)),
+            axsWethLPStakingContract(hre).then(c => c.getPendingRewards(address)),
+            slpWethLPStakingContract(hre).then(c => c.getPendingRewards(address)),
+        ]).then(rewards => rewards.reduce((s, r) => s.add(r), hre.ethers.BigNumber.from(0)))
+            .then(b => fe(hre, b))
+            .then(console.log);
+    });
+
 async function lpClaimAll(hre) {
     const ronPool = await ronWethLPStakingContract(hre);
     const axsPool = await axsWethLPStakingContract(hre);
     const slpPool = await slpWethLPStakingContract(hre);
     console.log('claiming from RON pool');
-    await ronPool.claimPendingRewards().then(tx => tx.wait());
+    await ronPool.estimateGas.claimPendingRewards()
+        .then(gas => ronPool.claimPendingRewards({ gasLimit: gas.mul(2) }))
+        .then(tx => tx.wait());
     console.log('claiming from AXS pool');
-    await axsPool.claimPendingRewards().then(tx => tx.wait());
+    await axsPool.estimateGas.claimPendingRewards()
+        .then(gas => axsPool.claimPendingRewards({ gasLimit: gas.mul(2) }))
+        .then(tx => tx.wait());
     console.log('claiming from SLP pool');
-    await slpPool.claimPendingRewards().then(tx => tx.wait());
+    await slpPool.estimateGas.claimPendingRewards()
+        .then(gas => slpPool.claimPendingRewards({ gasLimit: gas.mul(2) }))
+        .then(tx => tx.wait());
 }
 
 async function sellHalfRon(hre) {
@@ -220,7 +255,9 @@ async function sellHalfRon(hre) {
     const amountOut = await router.getAmountOut(ronToSell, reserve1, reserve0);
     const amountOutMin = amountOut.sub(amountOut.div(100).mul(2));
     console.log(`swap ${fe(hre, ronToSell)} RON for ${fe(hre, amountOutMin)}-${fe(hre, amountOut)} WETH`);
-    await router.swapExactRONForTokens(amountOutMin, [WRON, WETH], address, reserveTimestamp + 1000, { value: ronToSell }).then(tx => tx.wait());
+    await router.estimateGas.swapExactRONForTokens(amountOutMin, [WRON, WETH], address, reserveTimestamp + 1000, { value: ronToSell })
+        .then(gas => router.swapExactRONForTokens(amountOutMin, [WRON, WETH], address, reserveTimestamp + 1000, { value: ronToSell, gasLimit: gas.mul(2) }))
+        .then(tx => tx.wait());
 }
 
 async function lpAddRonWeth(hre) {
@@ -244,7 +281,9 @@ async function lpAddRonWeth(hre) {
 
     // add RON & WETH to LP
     console.log(`add LP: ${fe(hre, ronMin)}-${fe(hre, ronToSend)} RON ${fe(hre, wethMin)}-${fe(hre, wethBalance)} WETH`);
-    await router.addLiquidityRON(WETH, wethBalance, wethMin, ronMin, address, reserveTimestamp + 1000, { value: ronToSend }).then(tx => tx.wait());
+    await router.estimateGas.addLiquidityRON(WETH, wethBalance, wethMin, ronMin, address, reserveTimestamp + 1000, { value: ronToSend })
+        .then(gas => router.addLiquidityRON(WETH, wethBalance, wethMin, ronMin, address, reserveTimestamp + 1000, { value: ronToSend, gasLimit: gas.mul(2) }))
+        .then(tx => tx.wait());
 }
 
 async function lpStakeAll(hre) {
@@ -254,7 +293,9 @@ async function lpStakeAll(hre) {
 
     const lpBalance = await lp.balanceOf(address);
     console.log(`staking ${fe(hre, lpBalance)} RON/WETH LP`);
-    await pool.stake(lpBalance).then(tx => tx.wait());
+    await pool.estimateGas.stake(lpBalance)
+        .then(gas => pool.stake(lpBalance, { gasLimit: gas.mul(2) }))
+        .then(tx => tx.wait());
 }
 
 task('lp-claim', 'Claim all RON from Katana farms')
