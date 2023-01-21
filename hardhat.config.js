@@ -10,6 +10,8 @@ if (!fs.existsSync(configPath)) {
 }
 const config = JSON.parse(fs.readFileSync(configPath));
 
+const MIN_RON_BALANCE = config.ronin_farmer?.min_ron_balance || '500';
+
 const AXS = '0x97a9107c1793bc407d6f527b77e7fff4d812bece';
 const WRON = '0xe514d9deb7966c8be0ca922de8a064264ea6bcd4';
 const WETH = '0xc99a6a985ed2cac1ef41640596c5a5f9f4e19ef5';
@@ -245,12 +247,12 @@ async function sellHalfRon(hre) {
     const address = await getAddress(hre);
     const router = await katanaRouterContract(hre);
     const lp = await ronWethLPContract(hre);
-    const MIN_RON = hre.ethers.utils.parseEther('500');
+    const minRon = hre.ethers.utils.parseEther(MIN_RON_BALANCE);
     const ronBalance = await hre.ethers.provider.getBalance(address);
-    if (ronBalance.lte(MIN_RON)) {
-        throw new Error(`insufficient RON: ${hre.ethers.utils.formatEther(ronBalance, 'ether')} < ${hre.ethers.utils.formatEther(MIN_RON, 'ether')}`);
+    if (ronBalance.lte(minRon)) {
+        throw new Error(`insufficient RON: ${hre.ethers.utils.formatEther(ronBalance, 'ether')} < ${hre.ethers.utils.formatEther(minRon, 'ether')}`);
     }
-    const ronToSell = ronBalance.sub(MIN_RON).div(2);
+    const ronToSell = ronBalance.sub(minRon).div(2);
     const [ reserve0, reserve1, reserveTimestamp ] = await lp.getReserves();
     const amountOut = await router.getAmountOut(ronToSell, reserve1, reserve0);
     const amountOutMin = amountOut.sub(amountOut.div(100).mul(2));
@@ -266,10 +268,10 @@ async function lpAddRonWeth(hre) {
     const lp = await ronWethLPContract(hre);
 
     // make sure we have enough RON
-    const MIN_RON = hre.ethers.utils.parseEther('500');
+    const minRon = hre.ethers.utils.parseEther(MIN_RON_BALANCE);
     const ronBalance = await hre.ethers.provider.getBalance(address);
-    if (ronBalance.lte(MIN_RON)) {
-        throw new Error(`insufficient RON: ${fe(hre, ronBalance)} < ${fe(hre, MIN_RON)}`);
+    if (ronBalance.lte(minRon)) {
+        throw new Error(`insufficient RON: ${fe(hre, ronBalance)} < ${fe(hre, minRon)}`);
     }
 
     // calculate how much RON & WETH to send

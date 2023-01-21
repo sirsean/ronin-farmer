@@ -40,7 +40,10 @@ to the Ronin blockchain. So, create a file at `~/.wallet` that looks like this:
 ```json
 {
     "ronin": "https://api.roninchain.com/rpc",
-    "key": "YOUR-PRIVATE-KEY"
+    "key": "YOUR-PRIVATE-KEY",
+    "ronin_farmer": {
+        "min_ron_balance": 500
+    }
 }
 ```
 
