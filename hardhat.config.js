@@ -84,7 +84,7 @@ task('ron-balance', 'Print your RON balance')
     .setAction(async (_, hre) => {
         await getAddress(hre)
             .then(address => hre.ethers.provider.getBalance(address))
-            .then(b => hre.ethers.utils.formatEther(b, 'ether'))
+            .then(b => fe(hre, b))
             .then(console.log);
     });
 
@@ -94,7 +94,7 @@ task('axs-balance', 'AXS balance')
             getAddress(hre),
             erc20(hre, AXS),
         ]).then(([ address, contract ]) => contract.balanceOf(address))
-            .then(b => hre.ethers.utils.formatEther(b, 'ether'))
+            .then(b => fe(hre, b))
             .then(console.log);
     });
 
@@ -104,7 +104,7 @@ task('weth-balance', 'WETH balance')
             getAddress(hre),
             erc20(hre, WETH),
         ]).then(([ address, contract ]) => contract.balanceOf(address))
-            .then(b => hre.ethers.utils.formatEther(b, 'ether'))
+            .then(b => fe(hre, b))
             .then(console.log);
     });
 
@@ -114,7 +114,7 @@ task('axs-staked', 'AXS Staked')
             getAddress(hre),
             axsStakingContract(hre),
         ]).then(([ address, axsStaking ]) => axsStaking.getStakingAmount(address))
-            .then(b => hre.ethers.utils.formatEther(b, 'ether'))
+            .then(b => fe(hre, b))
             .then(console.log);
     });
 
@@ -124,7 +124,7 @@ task('axs-pending', 'AXS Pending')
             getAddress(hre),
             axsStakingContract(hre),
         ]).then(([ address, axsStaking ]) => axsStaking.getPendingRewards(address))
-            .then(b => hre.ethers.utils.formatEther(b, 'ether'))
+            .then(b => fe(hre, b))
             .then(console.log);
     });
 
@@ -134,7 +134,7 @@ task('land-pending', 'Land AXS Pending')
             getAddress(hre),
             landStakingContract(hre),
         ]).then(([ address, landStaking ]) => landStaking.getPendingRewards(address))
-            .then(b => hre.ethers.utils.formatEther(b, 'ether'))
+            .then(b => fe(hre, b))
             .then(console.log);
     });
 
@@ -195,7 +195,7 @@ task('lp-ron-pending', 'Pending RON in RON/WETH LP staking pool')
         const address = await getAddress(hre);
         const ronPool = await ronWethLPStakingContract(hre);
         await ronPool.getPendingRewards(address)
-            .then(b => hre.ethers.utils.formatEther(b, 'ether'))
+            .then(b => fe(hre, b))
             .then(console.log);
     });
 
@@ -204,7 +204,7 @@ task('lp-axs-pending', 'Pending RON in AXS/WETH LP staking pool')
         const address = await getAddress(hre);
         const axsPool = await axsWethLPStakingContract(hre);
         await axsPool.getPendingRewards(address)
-            .then(b => hre.ethers.utils.formatEther(b, 'ether'))
+            .then(b => fe(hre, b))
             .then(console.log);
     });
 
@@ -213,7 +213,7 @@ task('lp-slp-pending', 'Pending RON in SLP/WETH LP staking pool')
         const address = await getAddress(hre);
         const slpPool = await slpWethLPStakingContract(hre);
         await slpPool.getPendingRewards(address)
-            .then(b => hre.ethers.utils.formatEther(b, 'ether'))
+            .then(b => fe(hre, b))
             .then(console.log);
     });
 
@@ -254,7 +254,7 @@ async function sellHalfRon(hre) {
     const minRon = hre.ethers.utils.parseEther(MIN_RON_BALANCE);
     const ronBalance = await hre.ethers.provider.getBalance(address);
     if (ronBalance.lte(minRon)) {
-        throw new Error(`insufficient RON: ${hre.ethers.utils.formatEther(ronBalance, 'ether')} < ${hre.ethers.utils.formatEther(minRon, 'ether')}`);
+        throw new Error(`insufficient RON: ${fe(hre, ronBalance)} < ${fe(hre, minRon)}`);
     }
     const ronToSell = ronBalance.sub(minRon).div(2);
     const [ reserve0, reserve1, reserveTimestamp ] = await lp.getReserves();
