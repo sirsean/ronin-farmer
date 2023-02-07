@@ -52,15 +52,9 @@ async function ronWethLPStakingContract(hre) {
     return getContractAt(hre, abi, address);
 }
 
-async function axsWethLPStakingContract(hre) {
-    const address = '0x487671acdea3745b6dac3ae8d1757b44a04bfe8a';
-    const abi = parseAbi('./abi/AxsWethLPStakingPool.json');
-    return getContractAt(hre, abi, address);
-}
-
-async function slpWethLPStakingContract(hre) {
-    const address = '0xd4640c26c1a31cd632d8ae1a96fe5ac135d1eb52';
-    const abi = parseAbi('./abi/SlpWethLPStakingPool.json');
+async function ronAxsLPStakingContract(hre) {
+    const address = '0x14327fa6a4027d8f08c0a1b7feddd178156e9527';
+    const abi = parseAbi('./abi/RonWethLPStakingPool.json');
     return getContractAt(hre, abi, address);
 }
 
@@ -199,20 +193,11 @@ task('lp-ron-pending', 'Pending RON in RON/WETH LP staking pool')
             .then(console.log);
     });
 
-task('lp-axs-pending', 'Pending RON in AXS/WETH LP staking pool')
+task('lp-axs-pending', 'Pending RON in RON/AXS LP staking pool')
     .setAction(async (_, hre) => {
         const address = await getAddress(hre);
-        const axsPool = await axsWethLPStakingContract(hre);
+        const axsPool = await ronAxsLPStakingContract(hre);
         await axsPool.getPendingRewards(address)
-            .then(b => fe(hre, b))
-            .then(console.log);
-    });
-
-task('lp-slp-pending', 'Pending RON in SLP/WETH LP staking pool')
-    .setAction(async (_, hre) => {
-        const address = await getAddress(hre);
-        const slpPool = await slpWethLPStakingContract(hre);
-        await slpPool.getPendingRewards(address)
             .then(b => fe(hre, b))
             .then(console.log);
     });
@@ -222,8 +207,7 @@ task('lp-pending', 'Pending RON across LP staking pools')
         const address = await getAddress(hre);
         await Promise.all([
             ronWethLPStakingContract(hre).then(c => c.getPendingRewards(address)),
-            axsWethLPStakingContract(hre).then(c => c.getPendingRewards(address)),
-            slpWethLPStakingContract(hre).then(c => c.getPendingRewards(address)),
+            ronAxsLPStakingContract(hre).then(c => c.getPendingRewards(address)),
         ]).then(rewards => rewards.reduce((s, r) => s.add(r), hre.ethers.BigNumber.from(0)))
             .then(b => fe(hre, b))
             .then(console.log);
@@ -231,8 +215,7 @@ task('lp-pending', 'Pending RON across LP staking pools')
 
 async function lpClaimAll(hre) {
     const ronPool = await ronWethLPStakingContract(hre);
-    const axsPool = await axsWethLPStakingContract(hre);
-    const slpPool = await slpWethLPStakingContract(hre);
+    const axsPool = await ronAxsLPStakingContract(hre);
     console.log('claiming from RON pool');
     await ronPool.estimateGas.claimPendingRewards()
         .then(gas => ronPool.claimPendingRewards({ gasLimit: gas.mul(2) }))
@@ -240,10 +223,6 @@ async function lpClaimAll(hre) {
     console.log('claiming from AXS pool');
     await axsPool.estimateGas.claimPendingRewards()
         .then(gas => axsPool.claimPendingRewards({ gasLimit: gas.mul(2) }))
-        .then(tx => tx.wait());
-    console.log('claiming from SLP pool');
-    await slpPool.estimateGas.claimPendingRewards()
-        .then(gas => slpPool.claimPendingRewards({ gasLimit: gas.mul(2) }))
         .then(tx => tx.wait());
 }
 
