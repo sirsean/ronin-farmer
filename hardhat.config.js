@@ -112,22 +112,30 @@ task('axs-staked', 'AXS Staked')
             .then(console.log);
     });
 
+async function stakedAxsPending(hre) {
+    return Promise.all([
+        getAddress(hre),
+        axsStakingContract(hre),
+    ]).then(([ address, axsStaking ]) => axsStaking.getPendingRewards(address));
+}
+
 task('axs-pending', 'AXS Pending')
     .setAction(async (_, hre) => {
-        await Promise.all([
-            getAddress(hre),
-            axsStakingContract(hre),
-        ]).then(([ address, axsStaking ]) => axsStaking.getPendingRewards(address))
+        await stakedAxsPending(hre)
             .then(b => fe(hre, b))
             .then(console.log);
     });
 
+async function landPending(hre) {
+    return Promise.all([
+        getAddress(hre),
+        landStakingContract(hre),
+    ]).then(([ address, landStaking ]) => landStaking.getPendingRewards(address));
+}
+
 task('land-pending', 'Land AXS Pending')
     .setAction(async (_, hre) => {
-        await Promise.all([
-            getAddress(hre),
-            landStakingContract(hre),
-        ]).then(([ address, landStaking ]) => landStaking.getPendingRewards(address))
+        await landPending(hre)
             .then(b => fe(hre, b))
             .then(console.log);
     });
@@ -202,15 +210,32 @@ task('lp-axs-pending', 'Pending RON in RON/AXS LP staking pool')
             .then(console.log);
     });
 
+async function lpPending(hre) {
+    const address = await getAddress(hre);
+    return Promise.all([
+        ronWethLPStakingContract(hre).then(c => c.getPendingRewards(address)),
+        ronAxsLPStakingContract(hre).then(c => c.getPendingRewards(address)),
+    ]).then(rewards => rewards.reduce((s, r) => s.add(r), hre.ethers.BigNumber.from(0)));
+}
+
 task('lp-pending', 'Pending RON across LP staking pools')
     .setAction(async (_, hre) => {
-        const address = await getAddress(hre);
-        await Promise.all([
-            ronWethLPStakingContract(hre).then(c => c.getPendingRewards(address)),
-            ronAxsLPStakingContract(hre).then(c => c.getPendingRewards(address)),
-        ]).then(rewards => rewards.reduce((s, r) => s.add(r), hre.ethers.BigNumber.from(0)))
+        await lpPending(hre)
             .then(b => fe(hre, b))
             .then(console.log);
+    });
+
+task('pending', 'All pending rewards across land, LP, staking')
+    .setAction(async (_, hre) => {
+        await Promise.all([
+            lpPending(hre),
+            landPending(hre),
+            stakedAxsPending(hre),
+        ]).then(([ lp, land, stakedAxs ]) => {
+            console.log('Land:', fe(hre, land), 'AXS');
+            console.log('Stake:', fe(hre, stakedAxs), 'AXS');
+            console.log('LP:', fe(hre, lp), 'RON');
+        });
     });
 
 async function lpClaimAll(hre) {
