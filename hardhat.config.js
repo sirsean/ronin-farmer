@@ -141,6 +141,7 @@ task('land-pending', 'Land AXS Pending')
     });
 
 async function landClaim(hre) {
+    console.log('claiming land rewards');
     const landStaking = await landStakingContract(hre);
     await landStaking.estimateGas.claimPendingRewards()
         .then(gas => landStaking.claimPendingRewards({ gasLimit: gas.mul(2) }))
@@ -148,6 +149,7 @@ async function landClaim(hre) {
 }
 
 async function axsRestake(hre) {
+    console.log('restaking AXS rewards');
     const axsStaking = await axsStakingContract(hre);
     await axsStaking.estimateGas.restakeRewards()
         .then(gas => axsStaking.restakeRewards({ gasLimit: gas.mul(2) }))
@@ -155,6 +157,7 @@ async function axsRestake(hre) {
 }
 
 async function axsStakeAll(hre) {
+    console.log('staking all AXS');
     const address = await getAddress(hre);
     const axs = await erc20(hre, AXS);
     const axsStaking = await axsStakingContract(hre);
@@ -183,11 +186,8 @@ task('axs-stake-all', 'Stake all your AXS')
 
 task('axs-sweep', 'Sweep pending AXS')
     .setAction(async (_, hre) => {
-        console.log('claiming land rewards');
         await landClaim(hre);
-        console.log('restaking AXS rewards');
         await axsRestake(hre);
-        console.log('staking all AXS');
         await axsStakeAll(hre);
         console.log('sweep completed');
     });
@@ -330,6 +330,18 @@ task('lp-sweep', 'Claim all RON from Katana farms, sell RON for WETH, deposit RO
         await sellHalfRon(hre);
         await lpAddRonWeth(hre);
         await lpStakeAll(hre);
+    });
+
+task('sweep', 'Claim all pending AXS & RON, restake AXS, sell RON for WETH, deposit/stake RON/WETH LP')
+    .setAction(async (_, hre) => {
+        await landClaim(hre);
+        await axsRestake(hre);
+        await axsStakeAll(hre);
+        await lpClaimAll(hre);
+        await sellHalfRon(hre);
+        await lpAddRonWeth(hre);
+        await lpStakeAll(hre);
+        console.log('sweep completed');
     });
 
 /** @type import('hardhat/config').HardhatUserConfig */
