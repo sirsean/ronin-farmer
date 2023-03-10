@@ -55,6 +55,9 @@ npx hardhat axs-staked
 npx hardhat axs-pending
 npx hardhat land-pending
 npx hardhat lp-pending
+
+# or, all at once:
+npx hardhat pending
 ```
 
 # Sweep Your Rewards
@@ -62,6 +65,9 @@ npx hardhat lp-pending
 ```bash
 npx hardhat axs-sweep
 npx hardhat lp-sweep
+
+# or, all at once:
+npx hardhat sweep
 ```
 
 # Donate
