@@ -16,6 +16,13 @@ const MIN_RON_BALANCE = config.ronin_farmer?.min_ron_balance || '500';
 const AXS = '0x97a9107c1793bc407d6f527b77e7fff4d812bece';
 const WRON = '0xe514d9deb7966c8be0ca922de8a064264ea6bcd4';
 const WETH = '0xc99a6a985ed2cac1ef41640596c5a5f9f4e19ef5';
+const USDC = '0x0b7007c13325c48911f73a2dad5fa5dcbf808adc';
+
+// LP contracts on Ronin
+const RON_USDC_LP = '0x4f7687affc10857fccd0938ecda0947de7ad3812';
+const RON_SLP_LP = '0x8f1c5eda143fa3d1bea8b4e92f33562014d30e0d';
+const RON_AXS_LP = '0x32d1dbb6a4275133cc49f1c61653be3998ada4ff';
+const RON_WETH_LP = '0x2ecb08f87f075b5769fe543d0e52e40140575ea7';
 
 function parseAbi(filename) {
     return JSON.parse(fs.readFileSync(filename).toString());
@@ -64,10 +71,13 @@ async function katanaRouterContract(hre) {
     return getContractAt(hre, abi, address);
 }
 
-async function ronWethLPContract(hre) {
-    const address = '0x2ecb08f87f075b5769fe543d0e52e40140575ea7';
+async function katanaLPContract(hre, address) {
     const abi = parseAbi('./abi/KatanaLP.json');
     return getContractAt(hre, abi, address);
+}
+
+async function ronWethLPContract(hre) {
+    return katanaLPContract(hre, RON_WETH_LP);
 }
 
 function fe(hre, num) {
@@ -342,6 +352,71 @@ task('sweep', 'Claim all pending AXS & RON, restake AXS, sell RON for WETH, depo
         await lpAddRonWeth(hre);
         await lpStakeAll(hre);
         console.log('sweep completed');
+    });
+
+async function poolPrices(hre, lpAddress) {
+    const lp = await katanaLPContract(hre, lpAddress);
+    const [ token0Address, token1Address ] = await Promise.all([ lp.token0(), lp.token1() ]);
+    const token0 = await erc20(hre, token0Address);
+    const token1 = await erc20(hre, token1Address);
+    const [ token0Symbol, token0Decimals ] = await Promise.all([ token0.symbol(), token0.decimals() ]);
+    const [ token1Symbol, token1Decimals ] = await Promise.all([ token1.symbol(), token1.decimals() ]);
+    const [ reserve0, reserve1 ] = await lp.getReserves().then(([ r0, r1, _ ]) => {
+        return [
+            r0.div(hre.ethers.BigNumber.from(10).pow(token0Decimals)),
+            r1.div(hre.ethers.BigNumber.from(10).pow(token1Decimals)),
+        ];
+    });
+    return [
+        {
+            inSymbol: token0Symbol,
+            inAddr: token0Address,
+            outSymbol: token1Symbol,
+            outAddr: token1Address,
+            price: reserve0.toNumber() / reserve1.toNumber(),
+        },
+        {
+            inSymbol: token1Symbol,
+            inAddr: token1Address,
+            outSymbol: token0Symbol,
+            outAddr: token0Address,
+            price: reserve1.toNumber() / reserve0.toNumber(),
+        },
+    ];
+}
+
+async function buildPriceBook(hre) {
+    return Promise.all([RON_USDC_LP, RON_SLP_LP, RON_AXS_LP, RON_WETH_LP].map(addr => poolPrices(hre, addr)))
+        .then(all => all.flat());
+}
+
+// return the price, in terms of inSymbol, of the outSymbol token
+function getPrice(book, inSymbol, outSymbol) {
+    if (inSymbol == 'RON') {
+        return getPrice(book, 'WRON', outSymbol);
+    } else if (outSymbol == 'RON') {
+        return getPrice(book, inSymbol, 'WRON');
+    } else if (inSymbol == outSymbol) {
+        return 1;
+    } else if (inSymbol != 'WRON' && outSymbol != 'WRON') {
+        const step0 = book.filter(p => p.inSymbol == inSymbol && p.outSymbol == 'WRON')[0];
+        const step1 = book.filter(p => p.inSymbol == 'WRON' && p.outSymbol == outSymbol)[0];
+        return step0.price * step1.price;
+    } else if (inSymbol == 'WRON' || outSymbol == 'WRON') {
+        const step0 = book.filter(p => p.inSymbol == inSymbol && p.outSymbol == outSymbol)[0];
+        return step0.price;
+    }
+}
+
+task('prices', 'Check the liquidity pools to get the prices of the Ronin tokens')
+    .setAction(async (_, hre) => {
+        const book = await buildPriceBook(hre);
+        console.log('ETH/USD', getPrice(book, 'USDC', 'WETH'));
+        console.log('RON/USD', getPrice(book, 'USDC', 'RON'));
+        console.log('AXS/USD', getPrice(book, 'USDC', 'AXS'));
+        console.log('SLP/USD', getPrice(book, 'USDC', 'SLP'));
+        console.log('RON/ETH', getPrice(book, 'WETH', 'RON'));
+        console.log('AXS/ETH', getPrice(book, 'WETH', 'AXS'));
     });
 
 /** @type import('hardhat/config').HardhatUserConfig */

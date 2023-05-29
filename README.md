@@ -60,6 +60,15 @@ npx hardhat lp-pending
 npx hardhat pending
 ```
 
+# Check the Current Prices
+
+These are just the prices from the Katana LP on Ronin, unrelated to the actual
+off-Ronin prices.
+
+```bash
+npx hardhat prices
+```
+
 # Sweep Your Rewards
 
 ```bash
