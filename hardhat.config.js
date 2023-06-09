@@ -80,6 +80,10 @@ async function ronWethLPContract(hre) {
     return katanaLPContract(hre, RON_WETH_LP);
 }
 
+async function ronAxsLPContract(hre) {
+    return katanaLPContract(hre, RON_AXS_LP);
+}
+
 function fe(hre, num) {
     return hre.ethers.utils.formatEther(num, 'ether');
 }
@@ -112,12 +116,16 @@ task('weth-balance', 'WETH balance')
             .then(console.log);
     });
 
+async function getAxsStaked(hre) {
+    return Promise.all([
+        getAddress(hre),
+        axsStakingContract(hre),
+    ]).then(([ address, axsStaking ]) => axsStaking.getStakingAmount(address));
+}
+
 task('axs-staked', 'AXS Staked')
     .setAction(async (_, hre) => {
-        await Promise.all([
-            getAddress(hre),
-            axsStakingContract(hre),
-        ]).then(([ address, axsStaking ]) => axsStaking.getStakingAmount(address))
+        await getAxsStaked(hre)
             .then(b => fe(hre, b))
             .then(console.log);
     });
@@ -354,6 +362,11 @@ task('sweep', 'Claim all pending AXS & RON, restake AXS, sell RON for WETH, depo
         console.log('sweep completed');
     });
 
+function adjustDecimals(hre, number, decimals) {
+    const res = hre.ethers.utils.formatUnits(number, decimals);
+    return Math.round(res * 1e4) / 1e4;
+}
+
 async function poolPrices(hre, lpAddress) {
     const lp = await katanaLPContract(hre, lpAddress);
     const [ token0Address, token1Address ] = await Promise.all([ lp.token0(), lp.token1() ]);
@@ -408,6 +421,40 @@ function getPrice(book, inSymbol, outSymbol) {
     }
 }
 
+async function lpStakedBalance(hre, book, lpStakingContract, lpContract) {
+    const address = await getAddress(hre);
+    // get number of LP tokens staked
+    const stakingAmount = await lpStakingContract.getStakingAmount(address);
+    // get total supply of LP tokens
+    const lpTotalSupply = await lpContract.totalSupply();
+    // calculate percentage of LP owned
+    const lpPercentageOwned = adjustDecimals(hre, stakingAmount, 18) / adjustDecimals(hre, lpTotalSupply, 18);
+    // get reserves of each token
+    const [reserveToken0, reserveToken1] = await lpContract.getReserves();
+    // get tokens
+    const [token0Addr, token1Addr] = await Promise.all([
+        lpContract.token0(),
+        lpContract.token1(),
+    ]);
+    const token0 = await erc20(hre, token0Addr).then(c => Promise.all([c.symbol(), c.decimals()])).then(([ symbol, decimals ]) => ({ symbol, decimals }));;
+    const token1 = await erc20(hre, token1Addr).then(c => Promise.all([c.symbol(), c.decimals()])).then(([ symbol, decimals ]) => ({ symbol, decimals }));;
+    // multiply by owned-percentage to determine number of coins owned
+    const ownedToken0 = adjustDecimals(hre, reserveToken0, token0.decimals) * lpPercentageOwned;
+    const ownedToken1 = adjustDecimals(hre, reserveToken1, token1.decimals) * lpPercentageOwned;
+    // multiply by price of each to determine dollar value
+    const valueToken0 = ownedToken0 * getPrice(book, 'USDC', token0.symbol);
+    const valueToken1 = ownedToken1 * getPrice(book, 'USDC', token1.symbol);
+    return {
+        token0,
+        token1,
+        ownedToken0: ownedToken0,
+        ownedToken1: ownedToken1,
+        valueToken0: valueToken0,
+        valueToken1: valueToken1,
+        totalValue: valueToken0 + valueToken1,
+    };
+}
+
 task('prices', 'Check the liquidity pools to get the prices of the Ronin tokens')
     .setAction(async (_, hre) => {
         const book = await buildPriceBook(hre);
@@ -417,6 +464,47 @@ task('prices', 'Check the liquidity pools to get the prices of the Ronin tokens'
         console.log('SLP/USD', getPrice(book, 'USDC', 'SLP'));
         console.log('RON/ETH', getPrice(book, 'WETH', 'RON'));
         console.log('AXS/ETH', getPrice(book, 'WETH', 'AXS'));
+    });
+
+task('portfolio', 'Get all your Ronin balances and positions, with prices')
+    .setAction(async (_, hre) => {
+        const book = await buildPriceBook(hre);
+        const address = await getAddress(hre);
+        // RON balance
+        const ronBalance = await hre.ethers.provider.getBalance(address).then(b => adjustDecimals(hre, b, 18));
+        console.log('RON', ronBalance, ronBalance * getPrice(book, 'USDC', 'RON'));
+        // AXS staked
+        const axsStaked = await getAxsStaked(hre).then(b => adjustDecimals(hre, b, 18));
+        console.log('AXS Staked', axsStaked, axsStaked * getPrice(book, 'USDC', 'AXS'));
+        // AXS pending
+        const axsPending = await stakedAxsPending(hre).then(b => adjustDecimals(hre, b, 18));
+        console.log('AXS Staked Pending', axsPending, axsPending * getPrice(book, 'USDC', 'AXS'));
+        const axsLandPending = await landPending(hre).then(b => adjustDecimals(hre, b, 18));
+        console.log('AXS Land Pending', axsLandPending, axsLandPending * getPrice(book, 'USDC', 'AXS'));
+        // RON/WETH LP, staked
+        await Promise.all([
+            ronWethLPStakingContract(hre),
+            ronWethLPContract(hre),
+        ])
+            .then(([ lpStakingContract, lpContract ]) => lpStakedBalance(hre, book, lpStakingContract, lpContract))
+            .then(lp => {
+                console.log(`RON/WETH LP ${lp.token0.symbol}: ${lp.ownedToken0} ${lp.token1.symbol}: ${lp.ownedToken1} $${lp.totalValue}`);
+            });
+        // RON/WETH LP, pending
+        const ronWethLPStakedPending = await ronWethLPStakingContract(hre).then(c => c.getPendingRewards(address)).then(b => adjustDecimals(hre, b, 18));
+        console.log('RON/WETH LP Pending RON', ronWethLPStakedPending, ronWethLPStakedPending * getPrice(book, 'USDC', 'RON'));
+        // RON/AXS LP, staked
+        await Promise.all([
+            ronAxsLPStakingContract(hre),
+            ronAxsLPContract(hre),
+        ])
+            .then(([ lpStakingContract, lpContract ]) => lpStakedBalance(hre, book, lpStakingContract, lpContract))
+            .then(lp => {
+                console.log(`RON/AXS LP ${lp.token0.symbol}: ${lp.ownedToken0} ${lp.token1.symbol}: ${lp.ownedToken1} $${lp.totalValue}`);
+            });
+        // RON/AXS LP, pending
+        const ronAxsLPStakedPending = await ronAxsLPStakingContract(hre).then(c => c.getPendingRewards(address)).then(b => adjustDecimals(hre, b, 18));
+        console.log('RON/AXS LP Pending RON', ronAxsLPStakedPending, ronAxsLPStakedPending * getPrice(book, 'USDC', 'RON'));
     });
 
 /** @type import('hardhat/config').HardhatUserConfig */
