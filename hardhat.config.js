@@ -24,6 +24,12 @@ const RON_SLP_LP = '0x8f1c5eda143fa3d1bea8b4e92f33562014d30e0d';
 const RON_AXS_LP = '0x32d1dbb6a4275133cc49f1c61653be3998ada4ff';
 const RON_WETH_LP = '0x2ecb08f87f075b5769fe543d0e52e40140575ea7';
 
+// print the current time in the local timezone
+function printCurrentTime() {
+    const now = new Date().toLocaleString();
+    console.log(now);
+}
+
 function parseAbi(filename) {
     return JSON.parse(fs.readFileSync(filename).toString());
 }
@@ -352,6 +358,7 @@ task('lp-sweep', 'Claim all RON from Katana farms, sell RON for WETH, deposit RO
 
 task('sweep', 'Claim all pending AXS & RON, restake AXS, sell RON for WETH, deposit/stake RON/WETH LP')
     .setAction(async (_, hre) => {
+        printCurrentTime();
         await landClaim(hre);
         await axsRestake(hre);
         await axsStakeAll(hre);
@@ -457,6 +464,7 @@ async function lpStakedBalance(hre, book, lpStakingContract, lpContract) {
 
 task('prices', 'Check the liquidity pools to get the prices of the Ronin tokens')
     .setAction(async (_, hre) => {
+        printCurrentTime();
         const book = await buildPriceBook(hre);
         console.log('ETH/USD', getPrice(book, 'USDC', 'WETH'));
         console.log('RON/USD', getPrice(book, 'USDC', 'RON'));
@@ -468,6 +476,7 @@ task('prices', 'Check the liquidity pools to get the prices of the Ronin tokens'
 
 task('portfolio', 'Get all your Ronin balances and positions, with prices')
     .setAction(async (_, hre) => {
+        printCurrentTime();
         const book = await buildPriceBook(hre);
         const address = await getAddress(hre);
         // RON balance
