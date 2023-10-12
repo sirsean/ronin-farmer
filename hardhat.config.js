@@ -3,6 +3,13 @@ const os = require('os');
 const path = require('path');
 require("@nomiclabs/hardhat-waffle");
 
+// these reference the index in the accounts config, for each private key
+const Signer = Object.freeze({
+    MAIN: 0,
+    GENESIS: 1,
+    LAND: 2,
+});
+
 const configPath = path.join(os.homedir(), '.wallet');
 if (!fs.existsSync(configPath)) {
     console.log('config file missing, please place it at:', configPath);
@@ -34,52 +41,59 @@ function parseAbi(filename) {
     return JSON.parse(fs.readFileSync(filename).toString());
 }
 
-async function getAddress(hre) {
-    return hre.ethers.provider.getSigner().getAddress();
+function getSigner(hre, signer) {
+    if (!Object.values(Signer).includes(signer)) {
+        throw new Error(`invalid signer: ${signer}`);
+    }
+    return hre.ethers.provider.getSigner(signer);
 }
 
-async function getContractAt(hre, abi, address) {
-    return hre.ethers.getContractAt(abi, address, hre.ethers.provider.getSigner());
+async function getAddress(hre, signer) {
+    return getSigner(hre, signer).getAddress();
 }
 
-async function erc20(hre, address) {
+async function getContractAt(hre, signer, abi, address) {
+    return hre.ethers.getContractAt(abi, address, getSigner(hre, signer));
+}
+
+async function erc20(hre, signer, address) {
     const abi = parseAbi('./abi/@openzeppelin/contracts/token/ERC20/IERC20.sol/IERC20.json');
-    return getContractAt(hre, abi, address);
+    return getContractAt(hre, signer, abi, address);
 }
 
 async function axsStakingContract(hre) {
     const address = '0x05b0bb3c1c320b280501b86706c3551995bc8571';
     const abi = parseAbi('./abi/AXSStaking.json');
-    return getContractAt(hre, abi, address);
+    return getContractAt(hre, Signer.MAIN, abi, address);
 }
 
-async function landStakingContract(hre) {
+async function landStakingContract(hre, signer) {
     const address = '0xb2a5110f163ec592f8f0d4207253d8cbc327d9fb';
     const abi = parseAbi('./abi/LandStaking.json');
-    return getContractAt(hre, abi, address);
+    return getContractAt(hre, signer, abi, address);
 }
 
 async function ronWethLPStakingContract(hre) {
     const address = '0xb9072cec557528f81dd25dc474d4d69564956e1e';
     const abi = parseAbi('./abi/RonWethLPStakingPool.json');
-    return getContractAt(hre, abi, address);
+    return getContractAt(hre, Signer.MAIN, abi, address);
 }
 
 async function ronAxsLPStakingContract(hre) {
     const address = '0x14327fa6a4027d8f08c0a1b7feddd178156e9527';
     const abi = parseAbi('./abi/RonWethLPStakingPool.json');
-    return getContractAt(hre, abi, address);
+    return getContractAt(hre, Signer.MAIN, abi, address);
 }
 
 async function katanaRouterContract(hre) {
     const address = '0x7d0556d55ca1a92708681e2e231733ebd922597d';
     const abi = parseAbi('./abi/KatanaRouter.json');
-    return getContractAt(hre, abi, address);
+    return getContractAt(hre, Signer.MAIN, abi, address);
 }
 
 async function katanaLPContract(hre, address) {
     const abi = parseAbi('./abi/KatanaLP.json');
-    return getContractAt(hre, abi, address);
+    return getContractAt(hre, Signer.MAIN, abi, address);
 }
 
 async function ronWethLPContract(hre) {
@@ -90,41 +104,125 @@ async function ronAxsLPContract(hre) {
     return katanaLPContract(hre, RON_AXS_LP);
 }
 
+function adjustDecimals(hre, number, decimals) {
+    const res = hre.ethers.utils.formatUnits(number, decimals);
+    return Math.round(res * 1e4) / 1e4;
+}
+
 function fe(hre, num) {
     return hre.ethers.utils.formatEther(num, 'ether');
 }
 
+async function getRonBalanceForSigner(hre, signer) {
+    return getAddress(hre, signer)
+        .then(address => hre.ethers.provider.getBalance(address))
+        .then(b => adjustDecimals(hre, b, 18));
+}
+
+async function getRonBalance(hre) {
+    return Promise.all([
+        getRonBalanceForSigner(hre, Signer.MAIN),
+        getRonBalanceForSigner(hre, Signer.GENESIS),
+        getRonBalanceForSigner(hre, Signer.LAND),
+    ]).then(([main, genesis, land]) => {
+        return { main, genesis, land };
+    });
+}
+
+async function getAxsBalanceForSigner(hre, signer) {
+    return Promise.all([
+        getAddress(hre, signer),
+        erc20(hre, signer, AXS),
+    ]).then(([address, contract]) => {
+        return Promise.all([
+            contract.decimals(),
+            contract.balanceOf(address),
+        ]);
+    }).then(([decimals, balance]) => {
+        return adjustDecimals(hre, balance, decimals);
+    })
+}
+
+async function getAxsBalance(hre) {
+    return Promise.all([
+        getAxsBalanceForSigner(hre, Signer.MAIN),
+        getAxsBalanceForSigner(hre, Signer.GENESIS),
+        getAxsBalanceForSigner(hre, Signer.LAND),
+    ]).then(([main, genesis, land]) => {
+        return { main, genesis, land };
+    });
+}
+
+async function getWethBalanceForSigner(hre, signer) {
+    return Promise.all([
+        getAddress(hre, signer),
+        erc20(hre, signer, WETH),
+    ]).then(([address, contract]) => {
+        return Promise.all([
+            contract.decimals(),
+            contract.balanceOf(address),
+        ]);
+    }).then(([decimals, balance]) => {
+        return adjustDecimals(hre, balance, decimals);
+    })
+}
+
+async function getWethBalance(hre) {
+    return Promise.all([
+        getWethBalanceForSigner(hre, Signer.MAIN),
+        getWethBalanceForSigner(hre, Signer.GENESIS),
+        getWethBalanceForSigner(hre, Signer.LAND),
+    ]).then(([main, genesis, land]) => {
+        return { main, genesis, land };
+    });
+}
+
+async function getLandPendingForSigner(hre, signer) {
+    return Promise.all([
+        getAddress(hre, signer),
+        landStakingContract(hre, signer),
+        erc20(hre, signer, AXS),
+    ]).then(([address, landStaking, axs]) => {
+        return Promise.all([
+            landStaking.getPendingRewards(address),
+            axs.decimals(),
+        ]);
+    }).then(([pendingRewards, decimals]) => {
+        return adjustDecimals(hre, pendingRewards, decimals);
+    })
+}
+
+async function getLandPending(hre) {
+    return Promise.all([
+        getLandPendingForSigner(hre, Signer.MAIN),
+        getLandPendingForSigner(hre, Signer.GENESIS),
+        getLandPendingForSigner(hre, Signer.LAND),
+    ]).then(([main, genesis, land]) => {
+        return { main, genesis, land };
+    });
+}
+
 task('ron-balance', 'Print your RON balance')
     .setAction(async (_, hre) => {
-        await getAddress(hre)
-            .then(address => hre.ethers.provider.getBalance(address))
-            .then(b => fe(hre, b))
+        await getRonBalance(hre)
             .then(console.log);
     });
 
 task('axs-balance', 'AXS balance')
     .setAction(async (_, hre) => {
-        await Promise.all([
-            getAddress(hre),
-            erc20(hre, AXS),
-        ]).then(([address, contract]) => contract.balanceOf(address))
-            .then(b => fe(hre, b))
+        await getAxsBalance(hre)
             .then(console.log);
     });
 
 task('weth-balance', 'WETH balance')
     .setAction(async (_, hre) => {
-        await Promise.all([
-            getAddress(hre),
-            erc20(hre, WETH),
-        ]).then(([address, contract]) => contract.balanceOf(address))
-            .then(b => fe(hre, b))
+        await getWethBalance(hre)
             .then(console.log);
     });
 
 async function getAxsStaked(hre) {
     return Promise.all([
-        getAddress(hre),
+        getAddress(hre, Signer.MAIN),
         axsStakingContract(hre),
     ]).then(([address, axsStaking]) => axsStaking.getStakingAmount(address));
 }
@@ -138,7 +236,7 @@ task('axs-staked', 'AXS Staked')
 
 async function stakedAxsPending(hre) {
     return Promise.all([
-        getAddress(hre),
+        getAddress(hre, Signer.MAIN),
         axsStakingContract(hre),
     ]).then(([address, axsStaking]) => axsStaking.getPendingRewards(address));
 }
@@ -150,26 +248,30 @@ task('axs-pending', 'AXS Pending')
             .then(console.log);
     });
 
-async function landPending(hre) {
-    return Promise.all([
-        getAddress(hre),
-        landStakingContract(hre),
-    ]).then(([address, landStaking]) => landStaking.getPendingRewards(address));
-}
-
 task('land-pending', 'Land AXS Pending')
     .setAction(async (_, hre) => {
-        await landPending(hre)
-            .then(b => fe(hre, b))
+        await getLandPending(hre)
             .then(console.log);
     });
 
-async function landClaim(hre) {
-    console.log('claiming land rewards');
-    const landStaking = await landStakingContract(hre);
+async function landClaimForSigner(hre, signer) {
+    const address = await getAddress(hre, signer);
+    console.log('claiming land rewards,', address);
+    const landStaking = await landStakingContract(hre, signer);
+    const pending = await landStaking.getPendingRewards(address);
+    if (pending.isZero()) {
+        console.log(`no pending land rewards for ${address}`);
+        return;
+    }
     await landStaking.estimateGas.claimPendingRewards()
         .then(gas => landStaking.claimPendingRewards({ gasLimit: gas.mul(2) }))
         .then(tx => tx.wait());
+}
+
+async function landClaim(hre) {
+    await landClaimForSigner(hre, Signer.MAIN);
+    await landClaimForSigner(hre, Signer.GENESIS);
+    await landClaimForSigner(hre, Signer.LAND);
 }
 
 async function axsRestake(hre) {
@@ -182,8 +284,8 @@ async function axsRestake(hre) {
 
 async function axsStakeAll(hre) {
     console.log('staking all AXS');
-    const address = await getAddress(hre);
-    const axs = await erc20(hre, AXS);
+    const address = await getAddress(hre, Signer.MAIN);
+    const axs = await erc20(hre, Signer.MAIN, AXS);
     const axsStaking = await axsStakingContract(hre);
     await axs.balanceOf(address)
         .then(balance => {
@@ -218,7 +320,7 @@ task('axs-sweep', 'Sweep pending AXS')
 
 task('lp-ron-pending', 'Pending RON in RON/WETH LP staking pool')
     .setAction(async (_, hre) => {
-        const address = await getAddress(hre);
+        const address = await getAddress(hre, Signer.MAIN);
         const ronPool = await ronWethLPStakingContract(hre);
         await ronPool.getPendingRewards(address)
             .then(b => fe(hre, b))
@@ -227,7 +329,7 @@ task('lp-ron-pending', 'Pending RON in RON/WETH LP staking pool')
 
 task('lp-axs-pending', 'Pending RON in RON/AXS LP staking pool')
     .setAction(async (_, hre) => {
-        const address = await getAddress(hre);
+        const address = await getAddress(hre, Signer.MAIN);
         const axsPool = await ronAxsLPStakingContract(hre);
         await axsPool.getPendingRewards(address)
             .then(b => fe(hre, b))
@@ -235,7 +337,7 @@ task('lp-axs-pending', 'Pending RON in RON/AXS LP staking pool')
     });
 
 async function lpPending(hre) {
-    const address = await getAddress(hre);
+    const address = await getAddress(hre, Signer.MAIN);
     return Promise.all([
         ronWethLPStakingContract(hre).then(c => c.getPendingRewards(address)),
         ronAxsLPStakingContract(hre).then(c => c.getPendingRewards(address)),
@@ -253,12 +355,14 @@ task('pending', 'All pending rewards across land, LP, staking')
     .setAction(async (_, hre) => {
         await Promise.all([
             lpPending(hre),
-            landPending(hre),
+            getLandPending(hre),
             stakedAxsPending(hre),
         ]).then(([lp, land, stakedAxs]) => {
-            console.log('Land:', fe(hre, land), 'AXS');
-            console.log('Stake:', fe(hre, stakedAxs), 'AXS');
             console.log('LP:', fe(hre, lp), 'RON');
+            console.log('Stake:', fe(hre, stakedAxs), 'AXS');
+            console.log('Land (main):', land.main, 'AXS');
+            console.log('Land (genesis):', land.genesis, 'AXS');
+            console.log('Land (land):', land.land, 'AXS');
         });
     });
 
@@ -276,7 +380,7 @@ async function lpClaimAll(hre) {
 }
 
 async function sellHalfRon(hre) {
-    const address = await getAddress(hre);
+    const address = await getAddress(hre, Signer.MAIN);
     const router = await katanaRouterContract(hre);
     const lp = await ronWethLPContract(hre);
     const minRon = hre.ethers.utils.parseEther(MIN_RON_BALANCE);
@@ -295,7 +399,7 @@ async function sellHalfRon(hre) {
 }
 
 async function lpAddRonWeth(hre) {
-    const address = await getAddress(hre);
+    const address = await getAddress(hre, Signer.MAIN);
     const router = await katanaRouterContract(hre);
     const lp = await ronWethLPContract(hre);
 
@@ -307,7 +411,7 @@ async function lpAddRonWeth(hre) {
     }
 
     // calculate how much RON & WETH to send
-    const wethBalance = await erc20(hre, WETH).then(c => c.balanceOf(address));
+    const wethBalance = await erc20(hre, Signer.MAIN, WETH).then(c => c.balanceOf(address));
     const [reserve0, reserve1, reserveTimestamp] = await lp.getReserves();
     const ronToSend = await router.getAmountIn(wethBalance, reserve1, reserve0);
     const wethMin = wethBalance.sub(wethBalance.div(100).mul(2));
@@ -321,7 +425,7 @@ async function lpAddRonWeth(hre) {
 }
 
 async function lpStakeAll(hre) {
-    const address = await getAddress(hre);
+    const address = await getAddress(hre, Signer.MAIN);
     const lp = await ronWethLPContract(hre);
     const pool = await ronWethLPStakingContract(hre);
 
@@ -348,6 +452,36 @@ task('lp-add', 'Add RON/WETH liquidity and stake it to the farm')
         await lpStakeAll(hre);
     });
 
+async function sendAllAxs(hre, from, to) {
+    const address = await getAddress(hre, from);
+    const recipient = await getAddress(hre, to);
+    const axs = await erc20(hre, from, AXS);
+    const [decimals, balance] = await Promise.all([
+        axs.decimals(),
+        axs.balanceOf(address),
+    ]);
+    if (balance.isZero()) {
+        console.log(`no AXS to send from ${address}`);
+        return;
+    }
+    console.log(`sending ${adjustDecimals(hre, balance, decimals)} AXS from ${address} to ${recipient}`);
+    await axs.estimateGas.transfer(recipient, balance)
+        .then(gas => axs.transfer(recipient, balance, { gasLimit: gas.mul(2) }))
+        .then(tx => tx.wait());
+}
+
+async function sweepAxsToMain(hre) {
+    console.log('send all AXS from genesis wallet to main wallet');
+    await sendAllAxs(hre, Signer.GENESIS, Signer.MAIN);
+    console.log('send all AXS from land wallet to main wallet');
+    await sendAllAxs(hre, Signer.LAND, Signer.MAIN);
+}
+
+task('axs-sweep', 'Send all AXS from genesis/land wallets to main wallet')
+    .setAction(async (_, hre) => {
+        await sweepAxsToMain(hre);
+    })
+
 task('lp-sweep', 'Claim all RON from Katana farms, sell RON for WETH, deposit RON/WETH LP, stake it')
     .setAction(async (_, hre) => {
         await lpClaimAll(hre);
@@ -360,6 +494,7 @@ task('sweep', 'Claim all pending AXS & RON, restake AXS, sell RON for WETH, depo
     .setAction(async (_, hre) => {
         printCurrentTime();
         await landClaim(hre);
+        await sweepAxsToMain(hre);
         await axsRestake(hre);
         await axsStakeAll(hre);
         await lpClaimAll(hre);
@@ -369,16 +504,11 @@ task('sweep', 'Claim all pending AXS & RON, restake AXS, sell RON for WETH, depo
         console.log('sweep completed');
     });
 
-function adjustDecimals(hre, number, decimals) {
-    const res = hre.ethers.utils.formatUnits(number, decimals);
-    return Math.round(res * 1e4) / 1e4;
-}
-
 async function poolPrices(hre, lpAddress) {
     const lp = await katanaLPContract(hre, lpAddress);
     const [token0Address, token1Address] = await Promise.all([lp.token0(), lp.token1()]);
-    const token0 = await erc20(hre, token0Address);
-    const token1 = await erc20(hre, token1Address);
+    const token0 = await erc20(hre, Signer.MAIN, token0Address);
+    const token1 = await erc20(hre, Signer.MAIN, token1Address);
     const [token0Symbol, token0Decimals] = await Promise.all([token0.symbol(), token0.decimals()]);
     const [token1Symbol, token1Decimals] = await Promise.all([token1.symbol(), token1.decimals()]);
     const [reserve0, reserve1] = await lp.getReserves().then(([r0, r1, _]) => {
@@ -429,7 +559,7 @@ function getPrice(book, inSymbol, outSymbol) {
 }
 
 async function lpStakedBalance(hre, book, lpStakingContract, lpContract) {
-    const address = await getAddress(hre);
+    const address = await getAddress(hre, Signer.MAIN);
     // get number of LP tokens staked
     const stakingAmount = await lpStakingContract.getStakingAmount(address);
     // get total supply of LP tokens
@@ -443,8 +573,8 @@ async function lpStakedBalance(hre, book, lpStakingContract, lpContract) {
         lpContract.token0(),
         lpContract.token1(),
     ]);
-    const token0 = await erc20(hre, token0Addr).then(c => Promise.all([c.symbol(), c.decimals()])).then(([symbol, decimals]) => ({ symbol, decimals }));;
-    const token1 = await erc20(hre, token1Addr).then(c => Promise.all([c.symbol(), c.decimals()])).then(([symbol, decimals]) => ({ symbol, decimals }));;
+    const token0 = await erc20(hre, Signer.MAIN, token0Addr).then(c => Promise.all([c.symbol(), c.decimals()])).then(([symbol, decimals]) => ({ symbol, decimals }));;
+    const token1 = await erc20(hre, Signer.MAIN, token1Addr).then(c => Promise.all([c.symbol(), c.decimals()])).then(([symbol, decimals]) => ({ symbol, decimals }));;
     // multiply by owned-percentage to determine number of coins owned
     const ownedToken0 = adjustDecimals(hre, reserveToken0, token0.decimals) * lpPercentageOwned;
     const ownedToken1 = adjustDecimals(hre, reserveToken1, token1.decimals) * lpPercentageOwned;
@@ -478,18 +608,22 @@ task('portfolio', 'Get all your Ronin balances and positions, with prices')
     .setAction(async (_, hre) => {
         printCurrentTime();
         const book = await buildPriceBook(hre);
-        const address = await getAddress(hre);
+        const mainAddress = await getAddress(hre, Signer.MAIN);
         // RON balance
-        const ronBalance = await hre.ethers.provider.getBalance(address).then(b => adjustDecimals(hre, b, 18));
-        console.log('RON', ronBalance, ronBalance * getPrice(book, 'USDC', 'RON'));
+        const ronBalance = await getRonBalance(hre);
+        console.log('RON (main)', ronBalance.main, ronBalance.main * getPrice(book, 'USDC', 'RON'));
+        console.log('RON (genesis)', ronBalance.genesis, ronBalance.genesis * getPrice(book, 'USDC', 'RON'));
+        console.log('RON (land)', ronBalance.land, ronBalance.land * getPrice(book, 'USDC', 'RON'));
         // AXS staked
         const axsStaked = await getAxsStaked(hre).then(b => adjustDecimals(hre, b, 18));
         console.log('AXS Staked', axsStaked, axsStaked * getPrice(book, 'USDC', 'AXS'));
         // AXS pending
         const axsPending = await stakedAxsPending(hre).then(b => adjustDecimals(hre, b, 18));
         console.log('AXS Staked Pending', axsPending, axsPending * getPrice(book, 'USDC', 'AXS'));
-        const axsLandPending = await landPending(hre).then(b => adjustDecimals(hre, b, 18));
-        console.log('AXS Land Pending', axsLandPending, axsLandPending * getPrice(book, 'USDC', 'AXS'));
+        const landPending = await getLandPending(hre);
+        console.log('AXS Land Pending (main)', landPending.main, landPending.main * getPrice(book, 'USDC', 'AXS'));
+        console.log('AXS Land Pending (genesis)', landPending.genesis, landPending.genesis * getPrice(book, 'USDC', 'AXS'));
+        console.log('AXS Land Pending (land)', landPending.land, landPending.land * getPrice(book, 'USDC', 'AXS'));
         // RON/WETH LP, staked
         await Promise.all([
             ronWethLPStakingContract(hre),
@@ -500,7 +634,7 @@ task('portfolio', 'Get all your Ronin balances and positions, with prices')
                 console.log(`RON/WETH LP ${lp.token0.symbol}: ${lp.ownedToken0} ${lp.token1.symbol}: ${lp.ownedToken1} $${lp.totalValue}`);
             });
         // RON/WETH LP, pending
-        const ronWethLPStakedPending = await ronWethLPStakingContract(hre).then(c => c.getPendingRewards(address)).then(b => adjustDecimals(hre, b, 18));
+        const ronWethLPStakedPending = await ronWethLPStakingContract(hre).then(c => c.getPendingRewards(mainAddress)).then(b => adjustDecimals(hre, b, 18));
         console.log('RON/WETH LP Pending RON', ronWethLPStakedPending, ronWethLPStakedPending * getPrice(book, 'USDC', 'RON'));
         // RON/AXS LP, staked
         await Promise.all([
@@ -512,7 +646,7 @@ task('portfolio', 'Get all your Ronin balances and positions, with prices')
                 console.log(`RON/AXS LP ${lp.token0.symbol}: ${lp.ownedToken0} ${lp.token1.symbol}: ${lp.ownedToken1} $${lp.totalValue}`);
             });
         // RON/AXS LP, pending
-        const ronAxsLPStakedPending = await ronAxsLPStakingContract(hre).then(c => c.getPendingRewards(address)).then(b => adjustDecimals(hre, b, 18));
+        const ronAxsLPStakedPending = await ronAxsLPStakingContract(hre).then(c => c.getPendingRewards(mainAddress)).then(b => adjustDecimals(hre, b, 18));
         console.log('RON/AXS LP Pending RON', ronAxsLPStakedPending, ronAxsLPStakedPending * getPrice(book, 'USDC', 'RON'));
     });
 
@@ -522,7 +656,7 @@ module.exports = {
     networks: {
         ronin: {
             url: config.ronin,
-            accounts: [config.key],
+            accounts: [config.key, config.genesis_key, config.land_key],
         },
     },
     defaultNetwork: 'ronin',
