@@ -295,6 +295,28 @@ async function axsStakeAll(hre) {
         .then(tx => tx.wait());
 }
 
+async function topUpWallet(hre, signer, dest) {
+    const destAddress = await getAddress(hre, dest);
+    const one = hre.ethers.utils.parseEther('1.0');
+    const currentBalance = await hre.ethers.provider.getBalance(destAddress);
+    if (currentBalance.lt(one)) {
+        const amount = one.sub(currentBalance);
+        console.log(`top up wallet ${destAddress} by ${fe(hre, amount)}`);
+        await getSigner(hre, signer).sendTransaction({
+            to: destAddress,
+            value: amount,
+        }).then(tx => tx.wait());
+    } else {
+        console.log(`wallet ${destAddress} already topped up`);
+    }
+}
+
+task('topup-ron', 'Top up your RON')
+    .setAction(async (_, hre) => {
+        await topUpWallet(hre, Signer.MAIN, Signer.GENESIS);
+        await topUpWallet(hre, Signer.MAIN, Signer.LAND);
+    })
+
 task('land-claim', 'Claim AXS from staked land')
     .setAction(async (_, hre) => {
         await landClaim(hre);
