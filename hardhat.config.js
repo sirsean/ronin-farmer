@@ -317,6 +317,25 @@ task('topup-ron', 'Top up your RON')
         await topUpWallet(hre, Signer.MAIN, Signer.LAND);
     })
 
+function sendAxsToSteward(hre, signer, dest, percentage) {
+    return Promise.all([
+        getAddress(hre, signer),
+        erc20(hre, signer, AXS),
+    ]).then(async ([address, contract]) => {
+        const amount = await contract.balanceOf(address).then(b => b.mul(percentage).div(100));
+        console.log(`sending ${fe(hre, amount)} AXS from ${address} to ${dest}`);
+        return contract.estimateGas.transfer(dest, amount)
+            .then(gas => contract.transfer(dest, amount, { gasLimit: gas.mul(2) }))
+            .then(tx => tx.wait());
+    });
+}
+
+task('pay-steward', 'Send AXS from genesis/land to steward')
+    .setAction(async (_, hre) => {
+        await sendAxsToSteward(hre, Signer.GENESIS, config.axie_steward_address, 30);
+        await sendAxsToSteward(hre, Signer.LAND, config.axie_steward_address, 50);
+    });
+
 task('land-claim', 'Claim AXS from staked land')
     .setAction(async (_, hre) => {
         await landClaim(hre);
