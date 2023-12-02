@@ -104,6 +104,12 @@ async function ronAxsLPContract(hre) {
     return katanaLPContract(hre, RON_AXS_LP);
 }
 
+async function atiasBlessingContract(hre) {
+    const address = '0x9d3936dbd9a794ee31ef9f13814233d435bd806c';
+    const abi = parseAbi('./abi/AtiasBlessing.json');
+    return getContractAt(hre, Signer.MAIN, abi, address);
+}
+
 function adjustDecimals(hre, number, decimals) {
     const res = hre.ethers.utils.formatUnits(number, decimals);
     return Math.round(res * 1e4) / 1e4;
@@ -531,6 +537,14 @@ task('lp-sweep', 'Claim all RON from Katana farms, sell RON for WETH, deposit RO
         await lpStakeAll(hre);
     });
 
+async function claimAtiasBlessing(hre) {
+    console.log("claiming Atia's Blessing");
+    const atiasBlessing = await atiasBlessingContract(hre);
+    await atiasBlessing.estimateGas.activateStreak()
+        .then(gas => atiasBlessing.activateStreak({ gasLimit: gas.mul(2) }))
+        .then(tx => tx.wait());
+}
+
 task('sweep', 'Claim all pending AXS & RON, restake AXS, sell RON for WETH, deposit/stake RON/WETH LP')
     .setAction(async (_, hre) => {
         printCurrentTime();
@@ -542,6 +556,7 @@ task('sweep', 'Claim all pending AXS & RON, restake AXS, sell RON for WETH, depo
         await sellHalfRon(hre);
         await lpAddRonWeth(hre);
         await lpStakeAll(hre);
+        await claimAtiasBlessing(hre);
         console.log('sweep completed');
     });
 
