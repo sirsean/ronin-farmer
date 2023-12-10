@@ -545,6 +545,12 @@ async function claimAtiasBlessing(hre) {
         .then(tx => tx.wait());
 }
 
+task('claim-blessing', 'Claim Atia\'s Blessing')
+    .setAction(async (_, hre) => {
+        await claimAtiasBlessing(hre);
+        console.log('claim-blessing completed');
+    });
+
 task('sweep', 'Claim all pending AXS & RON, restake AXS, sell RON for WETH, deposit/stake RON/WETH LP')
     .setAction(async (_, hre) => {
         printCurrentTime();
