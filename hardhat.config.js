@@ -67,12 +67,6 @@ async function axsStakingContract(hre) {
     return getContractAt(hre, Signer.MAIN, abi, address);
 }
 
-async function landStakingContract(hre, signer) {
-    const address = '0xb2a5110f163ec592f8f0d4207253d8cbc327d9fb';
-    const abi = parseAbi('./abi/LandStaking.json');
-    return getContractAt(hre, signer, abi, address);
-}
-
 async function ronWethLPStakingContract(hre) {
     const address = '0xb9072cec557528f81dd25dc474d4d69564956e1e';
     const abi = parseAbi('./abi/RonWethLPStakingPool.json');
@@ -183,31 +177,6 @@ async function getWethBalance(hre) {
     });
 }
 
-async function getLandPendingForSigner(hre, signer) {
-    return Promise.all([
-        getAddress(hre, signer),
-        landStakingContract(hre, signer),
-        erc20(hre, signer, AXS),
-    ]).then(([address, landStaking, axs]) => {
-        return Promise.all([
-            landStaking.getPendingRewards(address),
-            axs.decimals(),
-        ]);
-    }).then(([pendingRewards, decimals]) => {
-        return adjustDecimals(hre, pendingRewards, decimals);
-    })
-}
-
-async function getLandPending(hre) {
-    return Promise.all([
-        getLandPendingForSigner(hre, Signer.MAIN),
-        getLandPendingForSigner(hre, Signer.GENESIS),
-        getLandPendingForSigner(hre, Signer.LAND),
-    ]).then(([main, genesis, land]) => {
-        return { main, genesis, land };
-    });
-}
-
 task('ron-balance', 'Print your RON balance')
     .setAction(async (_, hre) => {
         await getRonBalance(hre)
@@ -253,32 +222,6 @@ task('axs-pending', 'AXS Pending')
             .then(b => fe(hre, b))
             .then(console.log);
     });
-
-task('land-pending', 'Land AXS Pending')
-    .setAction(async (_, hre) => {
-        await getLandPending(hre)
-            .then(console.log);
-    });
-
-async function landClaimForSigner(hre, signer) {
-    const address = await getAddress(hre, signer);
-    console.log('claiming land rewards,', address);
-    const landStaking = await landStakingContract(hre, signer);
-    const pending = await landStaking.getPendingRewards(address);
-    if (pending.isZero()) {
-        console.log(`no pending land rewards for ${address}`);
-        return;
-    }
-    await landStaking.estimateGas.claimPendingRewards()
-        .then(gas => landStaking.claimPendingRewards({ gasLimit: gas.mul(2) }))
-        .then(tx => tx.wait());
-}
-
-async function landClaim(hre) {
-    await landClaimForSigner(hre, Signer.MAIN);
-    await landClaimForSigner(hre, Signer.GENESIS);
-    await landClaimForSigner(hre, Signer.LAND);
-}
 
 async function axsRestake(hre) {
     console.log('restaking AXS rewards');
@@ -342,11 +285,6 @@ task('pay-steward', 'Send AXS from genesis/land to steward')
         await sendAxsToSteward(hre, Signer.LAND, config.axie_steward_address, 50);
     });
 
-task('land-claim', 'Claim AXS from staked land')
-    .setAction(async (_, hre) => {
-        await landClaim(hre);
-    });
-
 task('axs-restake', 'Restake AXS')
     .setAction(async (_, hre) => {
         await axsRestake(hre);
@@ -359,7 +297,6 @@ task('axs-stake-all', 'Stake all your AXS')
 
 task('axs-sweep', 'Sweep pending AXS')
     .setAction(async (_, hre) => {
-        await landClaim(hre);
         await axsRestake(hre);
         await axsStakeAll(hre);
         console.log('sweep completed');
@@ -402,14 +339,10 @@ task('pending', 'All pending rewards across land, LP, staking')
     .setAction(async (_, hre) => {
         await Promise.all([
             lpPending(hre),
-            getLandPending(hre),
             stakedAxsPending(hre),
-        ]).then(([lp, land, stakedAxs]) => {
+        ]).then(([lp, stakedAxs]) => {
             console.log('LP:', fe(hre, lp), 'RON');
             console.log('Stake:', fe(hre, stakedAxs), 'AXS');
-            console.log('Land (main):', land.main, 'AXS');
-            console.log('Land (genesis):', land.genesis, 'AXS');
-            console.log('Land (land):', land.land, 'AXS');
         });
     });
 
@@ -554,7 +487,6 @@ task('claim-blessing', 'Claim Atia\'s Blessing')
 task('sweep', 'Claim all pending AXS & RON, restake AXS, sell RON for WETH, deposit/stake RON/WETH LP')
     .setAction(async (_, hre) => {
         printCurrentTime();
-        await landClaim(hre);
         await sweepAxsToMain(hre);
         await axsRestake(hre);
         await axsStakeAll(hre);
@@ -682,10 +614,6 @@ task('portfolio', 'Get all your Ronin balances and positions, with prices')
         // AXS pending
         const axsPending = await stakedAxsPending(hre).then(b => adjustDecimals(hre, b, 18));
         console.log('AXS Staked Pending', axsPending, axsPending * getPrice(book, 'USDC', 'AXS'));
-        const landPending = await getLandPending(hre);
-        console.log('AXS Land Pending (main)', landPending.main, landPending.main * getPrice(book, 'USDC', 'AXS'));
-        console.log('AXS Land Pending (genesis)', landPending.genesis, landPending.genesis * getPrice(book, 'USDC', 'AXS'));
-        console.log('AXS Land Pending (land)', landPending.land, landPending.land * getPrice(book, 'USDC', 'AXS'));
         // RON/WETH LP, staked
         await Promise.all([
             ronWethLPStakingContract(hre),
