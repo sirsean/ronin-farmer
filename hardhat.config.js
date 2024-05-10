@@ -346,17 +346,25 @@ task('pending', 'All pending rewards across land, LP, staking')
         });
     });
 
-async function lpClaimAll(hre) {
-    const ronPool = await ronWethLPStakingContract(hre);
-    const axsPool = await ronAxsLPStakingContract(hre);
+async function lpClaimRon(hre) {
     console.log('claiming from RON pool');
-    await ronPool.estimateGas.claimPendingRewards()
+    const ronPool = await ronWethLPStakingContract(hre);
+    return ronPool.estimateGas.claimPendingRewards()
         .then(gas => ronPool.claimPendingRewards({ gasLimit: gas.mul(2) }))
         .then(tx => tx.wait());
+}
+
+async function lpClaimAxs(hre) {
     console.log('claiming from AXS pool');
-    await axsPool.estimateGas.claimPendingRewards()
+    const axsPool = await ronAxsLPStakingContract(hre);
+    return axsPool.estimateGas.claimPendingRewards()
         .then(gas => axsPool.claimPendingRewards({ gasLimit: gas.mul(2) }))
         .then(tx => tx.wait());
+}
+
+async function lpClaimAll(hre) {
+    await lpClaimRon(hre);
+    //await lpClaimAxs(hre); // TODO re-enable this if we stake AXS/RON liquidity again
 }
 
 async function sellHalfRon(hre) {
@@ -494,7 +502,7 @@ task('sweep', 'Claim all pending AXS & RON, restake AXS, sell RON for WETH, depo
         await sellHalfRon(hre);
         await lpAddRonWeth(hre);
         await lpStakeAll(hre);
-        await claimAtiasBlessing(hre);
+        //await claimAtiasBlessing(hre); // TODO fix this claim
         console.log('sweep completed');
     });
 
